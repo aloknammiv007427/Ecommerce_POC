@@ -1,0 +1,58 @@
+trigger:
+  branches:
+    include:
+      - main
+      - release/*
+
+pool:
+  vmImage: 'ubuntu-latest' # Use Linux-based image for Kubernetes tasks
+
+variables:
+  namespace: 'ecommerce-namespace'       # Namespace for the application
+  imageName: 'ecommerce-dotnet-app'      # Docker image name
+  acrName: '<your-acr-name>'             # ACR name
+  replicaCount: 3                        # Number of application replicas
+
+stages:
+- stage: Deploy
+  displayName: Deploy to AKS
+  jobs:
+  - job: DeployToAKS
+    displayName: Deploy Application
+    steps:
+    - task: Kubernetes@1
+      displayName: Create Namespace
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceConnection: '<your-kubernetes-service-connection>'
+        command: 'apply'                # Create the namespace if it doesn't exist
+        arguments: |
+          -f k8s-namespace.yaml
+
+    - task: Kubernetes@1
+      displayName: Deploy Application to AKS
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceConnection: '<your-kubernetes-service-connection>'
+        namespace: $(namespace)         # Deploy to the specified namespace
+        command: 'apply'                # Apply Kubernetes manifests
+        arguments: |
+          -f k8s-deployment.yaml
+
+    - task: Kubernetes@1
+      displayName: Check Pod Status
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceConnection: '<your-kubernetes-service-connection>'
+        namespace: $(namespace)         # Check pod status in the namespace
+        command: 'get'
+        arguments: 'pods'
+
+    - task: Kubernetes@1
+      displayName: Validate Service
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceConnection: '<your-kubernetes-service-connection>'
+        namespace: $(namespace)         # Validate the service deployment
+        command: 'describe'
+        arguments: 'service ecommerce-service'
